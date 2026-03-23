@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -143,13 +144,9 @@ class MainWindow(QMainWindow):
         )
         self.results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.results_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.results_table.setEditTriggers(
-            QTableWidget.EditTrigger.DoubleClicked
-            | QTableWidget.EditTrigger.EditKeyPressed
-        )
+        self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.results_table.setAlternatingRowColors(True)
-        self.results_table.cellDoubleClicked.connect(self.on_table_double_clicked)
-        self.results_table.itemChanged.connect(self.on_results_item_changed)
+        self.results_table.cellDoubleClicked.connect(self.play_selected_file)
         self.results_table.verticalHeader().setVisible(False)
 
         header = self.results_table.horizontalHeader()
@@ -165,6 +162,9 @@ class MainWindow(QMainWindow):
         self.stop_button = QPushButton("Stop")
         self.stop_button.clicked.connect(self.stop_playback)
 
+        self.rename_button = QPushButton("Rename Selected")
+        self.rename_button.clicked.connect(self.rename_selected_file)
+
         self.open_folder_button = QPushButton("Open Batch Folder")
         self.open_folder_button.clicked.connect(self.open_batch_folder_dialog)
 
@@ -173,6 +173,7 @@ class MainWindow(QMainWindow):
 
         playback_layout.addWidget(self.play_button)
         playback_layout.addWidget(self.stop_button)
+        playback_layout.addWidget(self.rename_button)
         playback_layout.addWidget(self.open_folder_button)
         playback_layout.addWidget(self.clear_list_button)
         playback_layout.addStretch()
@@ -194,6 +195,11 @@ class MainWindow(QMainWindow):
         self.batch_spin.setEnabled(not busy)
         self.text_edit.setEnabled(not busy)
         self.instruct_edit.setEnabled(not busy)
+        self.play_button.setEnabled(not busy)
+        self.stop_button.setEnabled(not busy)
+        self.rename_button.setEnabled(not busy)
+        self.open_folder_button.setEnabled(not busy)
+        self.clear_list_button.setEnabled(not busy)
 
     def load_model(self):
         self._set_busy(True)
@@ -411,17 +417,23 @@ class MainWindow(QMainWindow):
         duration_item = QTableWidgetItem(format_seconds(result_item["duration_sec"]))
 
         trial_item.setFlags(trial_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        filename_item.setFlags(filename_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         duration_item.setFlags(duration_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
         self.results_table.setItem(row, 0, trial_item)
         self.results_table.setItem(row, 1, filename_item)
         self.results_table.setItem(row, 2, duration_item)
 
-    def get_selected_file_path(self):
+    def get_selected_row(self):
         row = self.results_table.currentRow()
         if row < 0 or row >= len(self.results):
             return None
+        return row
 
+    def get_selected_file_path(self):
+        row = self.get_selected_row()
+        if row is None:
+            return None
         return self.results[row]["path"]
 
     def update_batch_manifest_paths(self, batch_dir: str):
@@ -455,35 +467,28 @@ class MainWindow(QMainWindow):
                 f"The file was renamed, but manifest.json could not be updated:\n\n{e}",
             )
 
-    def on_table_double_clicked(self, row, column):
-        if column == 1:
-            item = self.results_table.item(row, column)
-            if item is not None:
-                self.results_table.editItem(item)
-        else:
-            self.play_selected_file()
-
-    def on_results_item_changed(self, item: QTableWidgetItem):
-        if self.updating_results_table:
-            return
-
-        row = item.row()
-        column = item.column()
-
-        if column != 1:
-            return
-
-        if row < 0 or row >= len(self.results):
+    def rename_selected_file(self):
+        row = self.get_selected_row()
+        if row is None:
+            QMessageBox.information(self, "No Selection", "Please select a file to rename.")
             return
 
         old_path = self.results[row]["path"]
         old_name = self.results[row]["filename"]
-        new_name = item.text().strip()
+
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Rename File",
+            "New filename:",
+            text=old_name,
+        )
+
+        if not ok:
+            return
+
+        new_name = new_name.strip()
 
         if not new_name:
-            self.updating_results_table = True
-            item.setText(old_name)
-            self.updating_results_table = False
             QMessageBox.warning(self, "Invalid Name", "Filename cannot be empty.")
             return
 
@@ -491,9 +496,6 @@ class MainWindow(QMainWindow):
             return
 
         if "/" in new_name or "\\" in new_name:
-            self.updating_results_table = True
-            item.setText(old_name)
-            self.updating_results_table = False
             QMessageBox.warning(self, "Invalid Name", "Filename cannot contain path separators.")
             return
 
@@ -501,9 +503,6 @@ class MainWindow(QMainWindow):
         new_ext = os.path.splitext(new_name)[1].lower()
 
         if new_ext != old_ext:
-            self.updating_results_table = True
-            item.setText(old_name)
-            self.updating_results_table = False
             QMessageBox.warning(
                 self,
                 "Invalid Extension",
@@ -515,9 +514,6 @@ class MainWindow(QMainWindow):
         new_path = os.path.join(batch_dir, new_name)
 
         if os.path.exists(new_path):
-            self.updating_results_table = True
-            item.setText(old_name)
-            self.updating_results_table = False
             QMessageBox.warning(
                 self,
                 "Name Already Exists",
@@ -529,6 +525,13 @@ class MainWindow(QMainWindow):
             os.rename(old_path, new_path)
             self.results[row]["path"] = new_path
             self.results[row]["filename"] = new_name
+
+            self.updating_results_table = True
+            filename_item = self.results_table.item(row, 1)
+            if filename_item is not None:
+                filename_item.setText(new_name)
+            self.updating_results_table = False
+
             self.update_batch_manifest_paths(batch_dir)
 
             if self.player.source().isLocalFile():
@@ -538,9 +541,6 @@ class MainWindow(QMainWindow):
                     self.now_playing_label.setText(f"Now playing: {new_path}")
 
         except Exception as e:
-            self.updating_results_table = True
-            item.setText(old_name)
-            self.updating_results_table = False
             QMessageBox.critical(
                 self,
                 "Rename Failed",
