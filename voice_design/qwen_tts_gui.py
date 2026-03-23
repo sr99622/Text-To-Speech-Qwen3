@@ -22,10 +22,9 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
-    QDialog,
+    QSizePolicy,
 )
 
 from batch_selection_dialog import BatchSelectionDialog
@@ -66,7 +65,6 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._set_busy(True)
-        self.append_log("Application started.")
         self.load_model()
 
     def _build_ui(self):
@@ -97,16 +95,20 @@ class MainWindow(QMainWindow):
         input_layout = QVBoxLayout()
         input_group.setLayout(input_layout)
 
+        text_label = QLabel("Text")
         self.text_edit = QPlainTextEdit()
         self.text_edit.setPlaceholderText("Enter the text to speak here...")
+        self.text_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
+        instruct_label = QLabel("Instruct")
         self.instruct_edit = QPlainTextEdit()
         self.instruct_edit.setPlaceholderText("Enter the voice instruction here...")
+        self.instruct_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
-        input_layout.addWidget(QLabel("Text"))
-        input_layout.addWidget(self.text_edit)
-        input_layout.addWidget(QLabel("Instruct"))
-        input_layout.addWidget(self.instruct_edit)
+        input_layout.addWidget(text_label)
+        input_layout.addWidget(self.text_edit, 1)
+        input_layout.addWidget(instruct_label)
+        input_layout.addWidget(self.instruct_edit, 0)
 
         button_layout = QHBoxLayout()
 
@@ -130,6 +132,7 @@ class MainWindow(QMainWindow):
         self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.results_table.setAlternatingRowColors(True)
         self.results_table.cellDoubleClicked.connect(self.play_selected_file)
+        self.results_table.verticalHeader().setVisible(False)
 
         header = self.results_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -163,22 +166,10 @@ class MainWindow(QMainWindow):
         results_layout.addLayout(playback_layout)
         results_layout.addWidget(self.now_playing_label)
 
-        log_group = QGroupBox("Log")
-        log_layout = QVBoxLayout()
-        log_group.setLayout(log_layout)
-
-        self.log_edit = QTextEdit()
-        self.log_edit.setReadOnly(True)
-        log_layout.addWidget(self.log_edit)
-
         main_layout.addWidget(controls_group)
         main_layout.addWidget(input_group, 1)
         main_layout.addLayout(button_layout)
         main_layout.addWidget(results_group, 1)
-        main_layout.addWidget(log_group, 1)
-
-    def append_log(self, message: str):
-        self.log_edit.append(message)
 
     def _set_busy(self, busy: bool):
         self.run_button.setEnabled(not busy and self.model is not None)
@@ -189,14 +180,12 @@ class MainWindow(QMainWindow):
 
     def load_model(self):
         self._set_busy(True)
-        self.append_log(f"Loading model: {MODEL_ID}")
 
         self.load_thread = QThread()
         self.load_worker = ModelLoadWorker()
         self.load_worker.moveToThread(self.load_thread)
 
         self.load_thread.started.connect(self.load_worker.run)
-        self.load_worker.status.connect(self.append_log)
         self.load_worker.finished.connect(self.on_model_loaded)
         self.load_worker.error.connect(self.on_model_load_error)
 
@@ -215,21 +204,12 @@ class MainWindow(QMainWindow):
         self.language_combo.clear()
         self.language_combo.addItems(languages)
 
-        if languages:
-            self.append_log(f"Model loaded successfully. {len(languages)} language(s) available.")
-        else:
-            self.append_log("Model loaded successfully, but no languages were returned.")
-
         self._set_busy(False)
 
     @pyqtSlot(str)
     def on_model_load_error(self, error_text):
         self.model = None
         self._set_busy(False)
-
-        self.append_log("Model load failed.")
-        self.append_log(error_text)
-
         QMessageBox.critical(self, "Model Load Error", error_text)
 
     def list_batch_dirs(self):
@@ -330,8 +310,6 @@ class MainWindow(QMainWindow):
         if loaded_results:
             self.results_table.selectRow(0)
 
-        self.append_log(f"Loaded batch folder: {batch_dir}")
-
     def run_generation(self):
         if self.model is None:
             QMessageBox.warning(self, "Model Not Ready", "The model is not loaded yet.")
@@ -355,9 +333,6 @@ class MainWindow(QMainWindow):
             return
 
         self._set_busy(True)
-        self.append_log(
-            f"Starting batch run: batch_size={batch_size}, language={language}"
-        )
 
         self.generate_thread = QThread()
         self.generate_worker = GenerateWorker(
@@ -371,7 +346,6 @@ class MainWindow(QMainWindow):
         self.generate_worker.moveToThread(self.generate_thread)
 
         self.generate_thread.started.connect(self.generate_worker.run)
-        self.generate_worker.status.connect(self.append_log)
         self.generate_worker.finished.connect(self.on_generation_finished)
         self.generate_worker.error.connect(self.on_generation_error)
 
@@ -392,7 +366,6 @@ class MainWindow(QMainWindow):
         for item in new_results:
             self.add_result_row(item)
 
-        self.append_log(f"Generation complete. Added {len(new_results)} file(s).")
         self._set_busy(False)
 
         if new_results:
@@ -401,9 +374,6 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def on_generation_error(self, error_text):
         self._set_busy(False)
-        self.append_log("Generation failed.")
-        self.append_log(error_text)
-
         QMessageBox.critical(self, "Generation Error", error_text)
 
     def add_result_row(self, result_item: dict):
@@ -436,14 +406,13 @@ class MainWindow(QMainWindow):
             return
 
         dialog = BatchSelectionDialog(batch_dirs, self)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
+        if dialog.exec() != BatchSelectionDialog.DialogCode.Accepted:
             return
 
         try:
             self.load_batch_folder(dialog.selected_batch_path)
         except Exception as e:
             QMessageBox.critical(self, "Load Batch Error", str(e))
-            self.append_log(traceback.format_exc())
 
     def play_selected_file(self, *_args):
         file_path = self.get_selected_file_path()
@@ -462,18 +431,15 @@ class MainWindow(QMainWindow):
         self.player.setSource(QUrl.fromLocalFile(file_path))
         self.player.play()
         self.now_playing_label.setText(f"Now playing: {file_path}")
-        self.append_log(f"Playing: {os.path.basename(file_path)}")
 
     def stop_playback(self):
         self.player.stop()
         self.now_playing_label.setText("Now playing: none")
-        self.append_log("Playback stopped.")
 
     def clear_results(self):
         self.stop_playback()
         self.results.clear()
         self.results_table.setRowCount(0)
-        self.append_log("Results list cleared.")
 
 
 def main():
