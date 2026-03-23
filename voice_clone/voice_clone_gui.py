@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -216,7 +215,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Qwen3-TTS Control Panel")
-        self.resize(980, 760)
+        self.resize(1100, 760)
 
         self.widgets: Dict[str, Any] = {}
         self.current_kwargs: Dict[str, Any] = {}
@@ -235,10 +234,18 @@ class MainWindow(QMainWindow):
         content_layout = QVBoxLayout(scroll_content)
         content_layout.setSpacing(12)
 
-        content_layout.addWidget(self._build_main_talker_group())
-        content_layout.addWidget(self._build_subtalker_group())
-        content_layout.addWidget(self._build_advanced_group())
-        content_layout.addWidget(self._build_kwargs_preview_group())
+        top_row = QHBoxLayout()
+        top_row.setSpacing(12)
+        top_row.addWidget(self._build_main_talker_group(), 1)
+        top_row.addWidget(self._build_subtalker_group(), 1)
+        content_layout.addLayout(top_row)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(12)
+        bottom_row.addWidget(self._build_advanced_group(), 1)
+        bottom_row.addWidget(self._build_kwargs_preview_group(), 1)
+        content_layout.addLayout(bottom_row)
+
         content_layout.addStretch()
 
         self.update_enabled_states()
@@ -337,7 +344,7 @@ class MainWindow(QMainWindow):
         return box
 
     def _build_advanced_group(self) -> QGroupBox:
-        box = QGroupBox("Advanced")
+        box = QGroupBox("Additional kwargs")
         layout = QVBoxLayout(box)
 
         top_row = QHBoxLayout()
@@ -357,14 +364,13 @@ class MainWindow(QMainWindow):
             '}'
         )
         self.widgets["kwargs_text"].setTabChangesFocus(True)
-        self.widgets["kwargs_text"].setFixedHeight(130)
         self.widgets["kwargs_text"].textChanged.connect(self.update_kwargs)
 
         self.kwargs_status_label = QLabel("")
         self.kwargs_status_label.setStyleSheet("color: gray;")
 
         layout.addLayout(top_row)
-        layout.addWidget(self.widgets["kwargs_text"])
+        layout.addWidget(self.widgets["kwargs_text"], 1)
         layout.addWidget(self.kwargs_status_label)
 
         return box
@@ -388,7 +394,7 @@ class MainWindow(QMainWindow):
         self.preview.setReadOnly(True)
 
         layout.addLayout(btn_row)
-        layout.addWidget(self.preview)
+        layout.addWidget(self.preview, 1)
         return box
 
     def _label_with_help(self, key: str) -> QWidget:
