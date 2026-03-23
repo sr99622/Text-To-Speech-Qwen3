@@ -30,7 +30,7 @@ python qwen_tts_install.py install --yes
 
 Qwen3-TTS has the ability to create voices using a prompt describing the voice. It has been observed that there is quite a bit a variability in the quality of the output that can have a dramatic effect on the tone of the speech. It is helpful to make several runs of the speech generation so that there are a number of candidates for the final selection of the audio clip.
 
-The program takes a text prompt which is the spoken text produced by the model and an instruct field that qualifies the type of voice desired. Then a batch process is run that will produce a number of candidates for the voice, which can be played back from inside the app.
+The program takes a voice quality prompt that describes the qualities the type of voice desired and a script to be read by the voice. Then a batch process is run that will produce a number of candidates for the voice, which can be played back from inside the app. File names can be changed from inside the app to make it easier to find them later on.
 
 In order to run this program, use the virtual environment created above for the installation and run
 
@@ -41,5 +41,5 @@ pip install pyqt6
 Then start the program 
 
 ```
-python voice_design_gui.py
+python voice_design/voice_design_gui.py
 ```
