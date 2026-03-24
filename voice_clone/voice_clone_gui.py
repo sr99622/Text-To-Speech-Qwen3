@@ -200,7 +200,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Qwen3-TTS Control Panel")
-        self.resize(980, 640)
+        self.resize(1040, 700)
 
         self.widgets: Dict[str, Any] = {}
         self.current_kwargs: Dict[str, Any] = {}
@@ -212,13 +212,6 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
-        button_row = QHBoxLayout()
-        self.reset_btn = QPushButton("Reset Defaults")
-        self.reset_btn.clicked.connect(self.reset_defaults)
-        button_row.addWidget(self.reset_btn)
-        button_row.addStretch()
-        main_layout.addLayout(button_row)
-
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         main_layout.addWidget(scroll)
@@ -228,15 +221,36 @@ class MainWindow(QMainWindow):
         content_layout = QVBoxLayout(scroll_content)
         content_layout.setSpacing(12)
 
-        top_row = QHBoxLayout()
-        top_row.setSpacing(12)
-        top_row.addWidget(self._build_main_talker_group(), 1)
-        top_row.addWidget(self._build_subtalker_group(), 1)
-        content_layout.addLayout(top_row)
+        content_layout.addWidget(self._build_model_tuning_group())
         content_layout.addStretch()
 
         self.update_enabled_states()
         self.update_kwargs()
+
+    def _build_model_tuning_group(self) -> QGroupBox:
+        box = QGroupBox("Model Tuning Parameters")
+        outer_layout = QVBoxLayout(box)
+        outer_layout.setSpacing(12)
+
+        panel_row = QHBoxLayout()
+        panel_row.setSpacing(12)
+        panel_row.addWidget(self._build_main_talker_group(), 1)
+        panel_row.addWidget(self._build_subtalker_group(), 1)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+
+        self.reset_btn = QPushButton("Restore Defaults")
+        self.reset_btn.clicked.connect(self.reset_defaults)
+        self.reset_btn.setMinimumWidth(160)
+        button_row.addWidget(self.reset_btn)
+
+        button_row.addStretch()
+
+        outer_layout.addLayout(panel_row)
+        outer_layout.addLayout(button_row)
+
+        return box
 
     def _build_main_talker_group(self) -> QGroupBox:
         box = QGroupBox("Main Talker")
@@ -249,13 +263,13 @@ class MainWindow(QMainWindow):
         self.widgets["do_sample"].setChecked(True)
         self.widgets["do_sample"].toggled.connect(self.update_enabled_states)
         self.widgets["do_sample"].toggled.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("do_sample"), self.widgets["do_sample"])
+        layout.addRow("do_sample", self._control_with_help(self.widgets["do_sample"], "do_sample"))
 
         self.widgets["top_k"] = QSpinBox()
         self.widgets["top_k"].setRange(1, 500)
         self.widgets["top_k"].setValue(50)
         self.widgets["top_k"].valueChanged.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("top_k"), self.widgets["top_k"])
+        layout.addRow("top_k", self._control_with_help(self.widgets["top_k"], "top_k"))
 
         self.widgets["top_p"] = QDoubleSpinBox()
         self.widgets["top_p"].setRange(0.0, 1.0)
@@ -263,7 +277,7 @@ class MainWindow(QMainWindow):
         self.widgets["top_p"].setDecimals(2)
         self.widgets["top_p"].setValue(0.90)
         self.widgets["top_p"].valueChanged.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("top_p"), self.widgets["top_p"])
+        layout.addRow("top_p", self._control_with_help(self.widgets["top_p"], "top_p"))
 
         self.widgets["temperature"] = QDoubleSpinBox()
         self.widgets["temperature"].setRange(0.05, 2.00)
@@ -271,7 +285,7 @@ class MainWindow(QMainWindow):
         self.widgets["temperature"].setDecimals(2)
         self.widgets["temperature"].setValue(0.70)
         self.widgets["temperature"].valueChanged.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("temperature"), self.widgets["temperature"])
+        layout.addRow("temperature", self._control_with_help(self.widgets["temperature"], "temperature"))
 
         self.widgets["repetition_penalty"] = QDoubleSpinBox()
         self.widgets["repetition_penalty"].setRange(1.00, 2.00)
@@ -279,13 +293,19 @@ class MainWindow(QMainWindow):
         self.widgets["repetition_penalty"].setDecimals(2)
         self.widgets["repetition_penalty"].setValue(1.10)
         self.widgets["repetition_penalty"].valueChanged.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("repetition_penalty"), self.widgets["repetition_penalty"])
+        layout.addRow(
+            "repetition_penalty",
+            self._control_with_help(self.widgets["repetition_penalty"], "repetition_penalty"),
+        )
 
         self.widgets["max_new_tokens"] = QSpinBox()
         self.widgets["max_new_tokens"].setRange(1, 32768)
         self.widgets["max_new_tokens"].setValue(2048)
         self.widgets["max_new_tokens"].valueChanged.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("max_new_tokens"), self.widgets["max_new_tokens"])
+        layout.addRow(
+            "max_new_tokens",
+            self._control_with_help(self.widgets["max_new_tokens"], "max_new_tokens"),
+        )
 
         return box
 
@@ -305,13 +325,19 @@ class MainWindow(QMainWindow):
         self.widgets["subtalker_dosample"].setChecked(True)
         self.widgets["subtalker_dosample"].toggled.connect(self.update_enabled_states)
         self.widgets["subtalker_dosample"].toggled.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("subtalker_dosample"), self.widgets["subtalker_dosample"])
+        layout.addRow(
+            "subtalker_dosample",
+            self._control_with_help(self.widgets["subtalker_dosample"], "subtalker_dosample"),
+        )
 
         self.widgets["subtalker_top_k"] = QSpinBox()
         self.widgets["subtalker_top_k"].setRange(1, 500)
         self.widgets["subtalker_top_k"].setValue(50)
         self.widgets["subtalker_top_k"].valueChanged.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("subtalker_top_k"), self.widgets["subtalker_top_k"])
+        layout.addRow(
+            "subtalker_top_k",
+            self._control_with_help(self.widgets["subtalker_top_k"], "subtalker_top_k"),
+        )
 
         self.widgets["subtalker_top_p"] = QDoubleSpinBox()
         self.widgets["subtalker_top_p"].setRange(0.0, 1.0)
@@ -319,7 +345,10 @@ class MainWindow(QMainWindow):
         self.widgets["subtalker_top_p"].setDecimals(2)
         self.widgets["subtalker_top_p"].setValue(1.00)
         self.widgets["subtalker_top_p"].valueChanged.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("subtalker_top_p"), self.widgets["subtalker_top_p"])
+        layout.addRow(
+            "subtalker_top_p",
+            self._control_with_help(self.widgets["subtalker_top_p"], "subtalker_top_p"),
+        )
 
         self.widgets["subtalker_temperature"] = QDoubleSpinBox()
         self.widgets["subtalker_temperature"].setRange(0.05, 2.00)
@@ -327,24 +356,26 @@ class MainWindow(QMainWindow):
         self.widgets["subtalker_temperature"].setDecimals(2)
         self.widgets["subtalker_temperature"].setValue(0.90)
         self.widgets["subtalker_temperature"].valueChanged.connect(self.update_kwargs)
-        layout.addRow(self._label_with_help("subtalker_temperature"), self.widgets["subtalker_temperature"])
+        layout.addRow(
+            "subtalker_temperature",
+            self._control_with_help(self.widgets["subtalker_temperature"], "subtalker_temperature"),
+        )
 
         return box
 
-    def _label_with_help(self, key: str) -> QWidget:
+    def _control_with_help(self, control: QWidget, key: str) -> QWidget:
         wrapper = QWidget()
         layout = QHBoxLayout(wrapper)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        label = QLabel(key)
         help_btn = QPushButton("?")
         help_btn.setFixedWidth(30)
         help_btn.clicked.connect(lambda: self.show_help(key))
 
-        layout.addWidget(label)
+        layout.addWidget(control, 1)
         layout.addWidget(help_btn)
-        layout.addStretch()
+
         return wrapper
 
     def show_help(self, key: str):
