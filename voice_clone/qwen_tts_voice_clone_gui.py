@@ -66,6 +66,7 @@ class MainWindow(QMainWindow):
 
         self.language = QComboBox()
         self.language.addItems(["English", "Chinese", "Russian"])
+        self.language.setCurrentText("English")
         f.addRow("Language", self.language)
 
         self.batch = QSpinBox()
@@ -127,12 +128,14 @@ class MainWindow(QMainWindow):
         return box
 
     def _build_batch(self):
-        box = QGroupBox("Voice Clone Batch Input")
+        box = QGroupBox("Voice Clone Script")
         v = QVBoxLayout(box)
 
         self.script = QPlainTextEdit()
         self.script.setPlaceholderText(
-            "Enter one script per paragraph.\n\nBlank lines separate batch items."
+            "Enter the script to generate.\n\n"
+            "Batch size controls how many candidate audio files will be generated "
+            "from this same script."
         )
         v.addWidget(self.script)
 
@@ -233,9 +236,9 @@ class MainWindow(QMainWindow):
 
     def run_batch(self):
         try:
-            scripts = [s.strip() for s in self.script.toPlainText().split("\n\n") if s.strip()]
-            if not scripts:
-                QMessageBox.warning(self, "Run Batch", "No scripts were provided.")
+            script_text = self.script.toPlainText().strip()
+            if not script_text:
+                QMessageBox.warning(self, "Run Batch", "No script was provided.")
                 return
 
             out = self.out.text().strip()
@@ -243,24 +246,44 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Run Batch", "Please select an output directory.")
                 return
 
+            if not self.ref_audio.text().strip():
+                QMessageBox.warning(self, "Run Batch", "Please select a reference audio file.")
+                return
+
+            if not self.reference_text.strip():
+                QMessageBox.warning(self, "Run Batch", "Please select a reference text file.")
+                return
+
             os.makedirs(out, exist_ok=True)
 
-            for i, text in enumerate(scripts[: self.batch.value()], 1):
-                path = os.path.join(out, f"voice_clone_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{i:03d}.wav")
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            batch_items = []
 
-                results = self.backend.generate_voice_clone_batch(
-                    [BatchItem(i, text, self.language.currentText(), path)],
-                    self.ref_audio.text(),
-                    self.reference_text,
-                    self.tuning_panel.get_generation_kwargs(),
+            for i in range(1, self.batch.value() + 1):
+                path = os.path.join(out, f"voice_clone_{stamp}_{i:03d}.wav")
+                batch_items.append(
+                    BatchItem(
+                        i,
+                        script_text,
+                        self.language.currentText(),
+                        path,
+                    )
                 )
 
-                for trial, fname, dur in results:
-                    r = self.table.rowCount()
-                    self.table.insertRow(r)
-                    self.table.setItem(r, 0, QTableWidgetItem(str(trial)))
-                    self.table.setItem(r, 1, QTableWidgetItem(os.path.basename(fname)))
-                    self.table.setItem(r, 2, QTableWidgetItem(f"{dur:.2f}"))
+            results = self.backend.generate_voice_clone_batch(
+                batch_items,
+                self.ref_audio.text(),
+                self.reference_text,
+                self.tuning_panel.get_generation_kwargs(),
+            )
+
+            for trial, fname, dur in results:
+                r = self.table.rowCount()
+                self.table.insertRow(r)
+                self.table.setItem(r, 0, QTableWidgetItem(str(trial)))
+                self.table.setItem(r, 1, QTableWidgetItem(os.path.basename(fname)))
+                self.table.setItem(r, 2, QTableWidgetItem(f"{dur:.2f}"))
+
         except Exception as exc:
             QMessageBox.critical(self, "Error", str(exc))
 
