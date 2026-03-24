@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QInputDialog,
 )
 
 try:
@@ -218,12 +219,16 @@ class MainWindow(QMainWindow):
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.clicked.connect(self.stop_playback)
 
+        self.rename_btn = QPushButton("Rename Selected")
+        self.rename_btn.clicked.connect(self.rename_selected_file)
+
         self.clear_btn = QPushButton("Clear List")
         self.clear_btn.clicked.connect(lambda: self.table.setRowCount(0))
 
         row.addWidget(self.open_batch_btn)
         row.addWidget(self.play_btn)
         row.addWidget(self.stop_btn)
+        row.addWidget(self.rename_btn)
         row.addWidget(self.clear_btn)
         row.addStretch()
 
@@ -575,6 +580,78 @@ class MainWindow(QMainWindow):
     def on_file_double_clicked(self, item: QTableWidgetItem):
         _ = item
         self.play_selected_file()
+
+    def rename_selected_file(self):
+        row = self.table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Rename Selected", "No file is selected.")
+            return
+
+        item = self.table.item(row, 1)
+        if item is None:
+            QMessageBox.warning(self, "Rename Selected", "No file is selected.")
+            return
+
+        old_path = item.data(Qt.ItemDataRole.UserRole)
+        if not old_path or not os.path.isfile(old_path):
+            QMessageBox.warning(self, "Rename Selected", "Selected file does not exist.")
+            return
+
+        old_name = os.path.basename(old_path)
+        old_root, old_ext = os.path.splitext(old_name)
+
+        new_base, ok = QInputDialog.getText(
+            self,
+            "Rename Selected File",
+            "New filename:",
+            text=old_root,
+        )
+        if not ok:
+            return
+
+        new_base = new_base.strip()
+        if not new_base:
+            QMessageBox.warning(self, "Rename Selected", "Filename cannot be empty.")
+            return
+
+        new_name = f"{new_base}{old_ext}"
+        if new_name == old_name:
+            return
+
+        new_path = os.path.join(os.path.dirname(old_path), new_name)
+        if os.path.exists(new_path):
+            QMessageBox.warning(self, "Rename Selected", "A file with that name already exists.")
+            return
+
+        try:
+            os.rename(old_path, new_path)
+        except Exception as exc:
+            QMessageBox.critical(self, "Rename Selected", str(exc))
+            return
+
+        item.setText(new_name)
+        item.setData(Qt.ItemDataRole.UserRole, new_path)
+
+        if self.current_batch_dir:
+            self.update_batch_metadata_after_file_rename(self.current_batch_dir, old_name, new_name)
+
+    def update_batch_metadata_after_file_rename(self, batch_dir: str, old_name: str, new_name: str):
+        metadata_path = os.path.join(batch_dir, "batch_metadata.json")
+        if not os.path.isfile(metadata_path):
+            return
+
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+
+            for file_info in metadata.get("files", []):
+                if file_info.get("filename") == old_name:
+                    file_info["filename"] = new_name
+
+            with open(metadata_path, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2)
+        except Exception:
+            pass
 
     def open_batch_folder_dialog(self):
         output_root = self.out.text().strip()
