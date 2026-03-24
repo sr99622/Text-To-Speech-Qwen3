@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
-    QLabel,
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
@@ -23,35 +22,39 @@ class BatchBrowserDialog(QDialog):
         self.output_root = output_root
         self.selected_batch_dir: Optional[str] = None
 
-        layout = QHBoxLayout(self)
-
         self.list_widget = QListWidget()
         self.preview = QPlainTextEdit()
         self.preview.setReadOnly(True)
 
-        layout.addWidget(self.list_widget, 1)
-        layout.addWidget(self.preview, 2)
-
-        button_box = QDialogButtonBox(
+        self.button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Open | QDialogButtonBox.StandardButton.Cancel
         )
-        button_box.accepted.connect(self.accept_selection)
-        button_box.rejected.connect(self.reject)
+        self.open_button = self.button_box.button(QDialogButtonBox.StandardButton.Open)
+        self.open_button.setEnabled(False)
 
-        outer = QVBoxLayout()
-        outer.addLayout(layout)
-        outer.addWidget(button_box)
+        self.button_box.accepted.connect(self.accept_selection)
+        self.button_box.rejected.connect(self.reject)
 
-        wrapper = QVBoxLayout()
-        wrapper.addLayout(outer)
-        self.setLayout(wrapper)
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(self.list_widget, 1)
+        body_layout.addWidget(self.preview, 2)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(body_layout)
+        layout.addWidget(self.button_box)
 
         self.list_widget.currentItemChanged.connect(self.update_preview)
+        self.list_widget.currentItemChanged.connect(self.update_open_button_state)
+        self.list_widget.itemDoubleClicked.connect(self.on_item_double_clicked)
+
         self.populate()
 
     def populate(self):
         self.list_widget.clear()
+
         if not os.path.isdir(self.output_root):
+            self.preview.setPlainText("Output directory does not exist.")
+            self.open_button.setEnabled(False)
             return
 
         dirs = []
@@ -69,9 +72,17 @@ class BatchBrowserDialog(QDialog):
 
         if self.list_widget.count() > 0:
             self.list_widget.setCurrentRow(0)
+        else:
+            self.preview.setPlainText("No batch folders were found.")
+            self.open_button.setEnabled(False)
 
-    def update_preview(self, current: QListWidgetItem, previous: QListWidgetItem):
+    def update_open_button_state(self, current: Optional[QListWidgetItem], previous: Optional[QListWidgetItem]):
         _ = previous
+        self.open_button.setEnabled(current is not None)
+
+    def update_preview(self, current: Optional[QListWidgetItem], previous: Optional[QListWidgetItem]):
+        _ = previous
+
         if not current:
             self.preview.clear()
             return
@@ -108,6 +119,12 @@ class BatchBrowserDialog(QDialog):
     def accept_selection(self):
         item = self.list_widget.currentItem()
         if not item:
+            return
+        self.selected_batch_dir = item.data(256)
+        self.accept()
+
+    def on_item_double_clicked(self, item: QListWidgetItem):
+        if item is None:
             return
         self.selected_batch_dir = item.data(256)
         self.accept()
