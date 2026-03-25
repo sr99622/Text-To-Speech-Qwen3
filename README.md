@@ -16,7 +16,7 @@ Create a Python virtual environment and activate, then run the following command
 git clone https://github.com/sr99622/Text-To-Speech-Qwen3
 cd Text-To-Speech-Qwen3
 pip install -r requirements.txt
-python qwen_tts_install.py install
+python qwen-tts-install.py install
 ```
 
 
@@ -29,12 +29,12 @@ python qwen-tts-install.py preview
 
 To get the installation instructions in json format
 ```
-python qwen_tts_install.py resolve --json
+python qwen-tts-install.py resolve --json
 ```
 
 To have the program do the actual installation, with a confirmation prompt
 ```
-python qwen_tts_install.py install
+python qwen-tts-install.py install
 ```
 
 To install without prompting
