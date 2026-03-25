@@ -24,7 +24,7 @@ python qwen_tts_install.py install
 
 To preview the installation instructions
 ```
-python qwen_tts_install.py preview
+python qwen-tts-install.py preview
 ```
 
 To get the installation instructions in json format
