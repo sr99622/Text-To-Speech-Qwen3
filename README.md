@@ -19,6 +19,12 @@ pip install -r requirements.txt
 python qwen-tts-install.py install
 ```
 
+If you are not getting sound output from the program, you may need additional components for the QMediaPlayer component from PyQt6. For example, on Ubuntu, use
+
+```
+sudo apt-get update
+sudo apt-get install gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-pulseaudio
+```
 
 <details><summary>Other Installer Configurations</summary>
 
